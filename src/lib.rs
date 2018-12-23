@@ -280,12 +280,13 @@ impl ToolFamily {
 struct Object {
     src: PathBuf,
     dst: PathBuf,
+    language: BuildLanguage,
 }
 
 impl Object {
     /// Create a new source file -> object file pair.
-    fn new(src: PathBuf, dst: PathBuf) -> Object {
-        Object { src: src, dst: dst }
+    fn new(src: PathBuf, dst: PathBuf, language: BuildLanguage) -> Object {
+        Object { src: src, dst: dst, language: language }
     }
 }
 
@@ -990,7 +991,7 @@ impl Build {
                 }
             };
 
-            objects.push(Object::new(file.to_path_buf(), obj));
+            objects.push(Object::new(file.to_path_buf(), obj, self.language));
         }
         self.compile_objects(&objects)?;
         self.assemble(lib_name, &dst.join(gnu_lib_name), &objects)?;
@@ -1075,10 +1076,17 @@ impl Build {
     }
 
     fn compile_object(&self, obj: &Object) -> Result<(), Error> {
+        println!("self is {:?}", self);
+        println!("compile_object: {:?}", obj);
         let is_asm = obj.src.extension().and_then(|s| s.to_str()) == Some("asm");
+        let is_assembler = if let BuildLanguage::Assembler = obj.language {
+            true
+        } else {
+            false
+        };
         let target = self.get_target()?;
         let msvc = target.contains("msvc");
-        let (mut cmd, name) = if msvc && is_asm {
+        let (mut cmd, name) = if msvc && (is_asm || is_assembler) {
             self.msvc_macro_assembler()?
         } else {
             let compiler = self.try_get_compiler()?;
